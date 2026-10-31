@@ -1,7 +1,7 @@
 # Builds SecondWind-Convert for each platform from the private source repo, on demand.
 # Needs the PRIVATE_REPO_TOKEN secret (read-only access to the source repo). Logs stay short on
 # purpose: test output goes to a file and only the summary is printed. The programs are kept for
-# one day, for the kits.
+# one day, for the kits. The Intel Mac converter is built on the iMac (no Intel runner was free).
 name: converter
 
 on:
@@ -24,8 +24,6 @@ jobs:
             label: windows
           - os: macos-14
             label: mac-arm64
-          - os: macos-13
-            label: mac-intel
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
