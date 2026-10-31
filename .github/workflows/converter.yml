@@ -1,0 +1,64 @@
+# Builds SecondWind-Convert for each platform from the private source repo, on demand.
+# Needs the PRIVATE_REPO_TOKEN secret (read-only access to the source repo). Logs stay short on
+# purpose: test output goes to a file and only the summary is printed. The programs are kept for
+# one day, for the kits.
+name: converter
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Source branch or commit
+        default: claude/ssl3-probe
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+          - os: macos-14
+            label: mac-arm64
+          - os: macos-13
+            label: mac-intel
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: aeristupac/psabr-revival
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: src
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: python -m pip install --quiet cryptography pyinstaller pyyaml
+      - name: Tests
+        shell: bash
+        working-directory: src
+        run: |
+          if python -m unittest discover -s tests > ../tests.log 2>&1; then tail -n 3 ../tests.log
+          else tail -n 3 ../tests.log; echo "Tests failed (details kept private)"; exit 1; fi
+      - name: Build
+        shell: bash
+        working-directory: src
+        run: python -m PyInstaller --noconfirm --console --onefile --log-level ERROR --name SecondWind-Convert --paths tools tools/convert_113.py
+      - name: Check
+        shell: bash
+        working-directory: src
+        run: |
+          f=dist/SecondWind-Convert; [ -f "$f.exe" ] && f="$f.exe"
+          "./$f" --help > /dev/null && echo "runs"
+          python -c "import hashlib,sys;p=sys.argv[1];print(p, hashlib.sha256(open(p,'rb').read()).hexdigest())" "$f"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecondWind-Convert-${{ matrix.label }}
+          path: src/dist/
+          retention-days: 1
